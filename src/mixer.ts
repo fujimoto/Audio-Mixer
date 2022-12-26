@@ -15,6 +15,8 @@ export class Mixer extends Readable {
     protected inputs: Input[];
 
     protected sampleByteLength: number;
+    protected minSampleValue: number;
+    protected maxSampleValue: number;
 
     protected readSample;
     protected writeSample;
@@ -37,11 +39,15 @@ export class Mixer extends Readable {
             this.writeSample = buffer.writeInt8;
 
             this.sampleByteLength = 1;
+            this.maxSampleValue = 127;
+            this.minSampleValue = -128;
         } else if (args.bitDepth === 32) {
             this.readSample = buffer.readInt32LE;
             this.writeSample = buffer.writeInt32LE;
 
             this.sampleByteLength = 4;
+            this.maxSampleValue = 2147483647;
+            this.minSampleValue = -2147483648;
         } else {
             args.bitDepth = 16;
 
@@ -49,6 +55,8 @@ export class Mixer extends Readable {
             this.writeSample = buffer.writeInt16LE;
 
             this.sampleByteLength = 2;
+            this.maxSampleValue = 32767;
+            this.minSampleValue = -32768;
         }
 
         this.args = args;
@@ -71,7 +79,14 @@ export class Mixer extends Readable {
                     let inputBuffer = this.args.channels === 1 ? input.readMono(samples) : input.readStereo(samples);
 
                     for (let i = 0; i < samples * this.args.channels; i++) {
-                        let sample = this.readSample.call(mixedBuffer, i * this.sampleByteLength) + Math.floor(this.readSample.call(inputBuffer, i * this.sampleByteLength) / this.inputs.length);
+                        // let sample = this.readSample.call(mixedBuffer, i * this.sampleByteLength) + Math.floor(this.readSample.call(inputBuffer, i * this.sampleByteLength) / this.inputs.length);
+                        let sample = this.readSample.call(mixedBuffer, i * this.sampleByteLength) + this.readSample.call(inputBuffer, i * this.sampleByteLength);
+                        if (sample > this.maxSampleValue) {
+                          sample = this.maxSampleValue;
+                        }
+                        if (sample < this.minSampleValue) {
+                          sample = this.minSampleValue;
+                        }
                         this.writeSample.call(mixedBuffer, sample, i * this.sampleByteLength);
                     }
                 }
